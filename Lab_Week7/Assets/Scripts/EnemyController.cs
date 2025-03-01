@@ -1,38 +1,63 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
 public class EnemyController : MonoBehaviour
 {
-
-    public Transform player = null;
-
-    public float speed;
-
-
-
-    // Start is called before the first frame update
-    private void OnTriggerEnter(Collider other)
+    public Transform patrolRoute; // Parent containing waypoints
+    public Transform player; // Player reference
+    private NavMeshAgent agent;
+    private Transform[] locations;
+    private int currentLocation = 0;
+    private bool chasingPlayer = false;
+    void Start()
+    {
+        agent = GetComponent<NavMeshAgent>();
+        InitializePatrolRoute();
+        MoveToNextPatrolLocation();
+    }
+    void Update()
+    {
+        if (!chasingPlayer && !agent.pathPending && agent.remainingDistance < 0.2f)
+        {
+            MoveToNextPatrolLocation();
+        }
+    }
+    void MoveToNextPatrolLocation()
+    {
+        if (locations.Length == 0) return;
+        agent.SetDestination(locations[currentLocation].position);
+        currentLocation = (currentLocation + 1) % locations.Length;
+    }
+    void InitializePatrolRoute()
+    {
+        locations = new Transform[patrolRoute.childCount];
+        for (int i = 0; i < patrolRoute.childCount; i++)
+        {
+            locations[i] = patrolRoute.GetChild(i);
+        }
+    }
+    // Detect when player enters enemy's range
+    void OnTriggerEnter(Collider other)
     {
         if (other.tag == "Player")
         {
-            player = other.transform;
+            Debug.Log("Player detected - start chasing!");
+            GetComponent<Renderer>().material.color = Color.yellow;
+            chasingPlayer = true;
+            agent.SetDestination(player.position);
         }
-
     }
-
-    private void OnTriggerExit(Collider other)
+    // Detect when player leaves enemy's range
+    void OnTriggerExit(Collider other)
     {
-        player = null;
-    }
-
-
-    // Update is called once per frame
-    void Update()
-    {
-        if(player != null)
+        if (other.name == "Player")
         {
-            transform.position = Vector3.MoveTowards(transform.position, player.position, speed * Time.deltaTime);
+            Debug.Log("Player out of range - resume patrol.");
+            GetComponent<Renderer>().material.color = Color.white;
+            chasingPlayer = false;
+            MoveToNextPatrolLocation();
         }
     }
 }
